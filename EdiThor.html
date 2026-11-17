@@ -1,0 +1,2162 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+	<meta charset="utf-8">
+	<title>EdiThor</title>
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<style>
+		:root {
+			--bg: #f6f7fb;
+			--panel: #ffffff;
+			--border: #d9dce6;
+			--text: #222;
+			--muted: #6b7280;
+			--accent: #3b82f6;
+			--icon-color: #374151;
+		}
+
+		body {
+			background: var(--bg);
+			color: var(--text);
+			transition: background 0.6s ease, color 0.6s ease;
+			font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+			margin: 12px;
+		}
+		#edithor {
+			min-height: 420px;
+			height: 100%;
+		}
+		#content {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+			height: 100%;
+			min-height: 420px;
+		}
+
+		#editor, #codeview {
+			flex: 1;
+			min-height: inherit;
+			max-height: none;
+			padding: .3em;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			line-height: 1.5;
+			box-sizing: border-box;
+			overflow-y: auto;
+			width: 100%;
+		}
+		#editor {
+			box-shadow: inset 0 1px 3px rgba(0,0,0,0.08);
+			border-radius: 6px;
+			transition: border-color .2s, box-shadow .2s;
+		}
+		#editor:focus-within {
+			border-color: var(--accent);
+			box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+		}
+		#codeview {
+			color: var(--icon-color);
+			display: none;
+			font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+			white-space: pre;
+			text-wrap: auto;
+			flex: 1;
+		}
+
+		.toolbar {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 4px;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			align-items: center;
+			padding: 4px;
+			transition: background 0.6s ease, border-color 0.6s ease;
+		}
+		.tool {
+			border-radius: 6px;
+			transition: background .2s, transform .1s;
+			display: inline-flex;
+			align-items: center;
+			justify-content: center;
+			border: 1px solid var(--border);
+			background: #f0f2f8;
+			cursor: pointer;
+			transition: background .15s, border-color .15s;
+			min-width: 40px;
+			min-height: 40px;
+			transition: background .2s, transform .1s, box-shadow .2s;
+		}
+		.tool:hover {
+			background: #e0e7ff;
+			transform: translateY(-1px);
+			border-color: #cfd3df;
+			box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+		}
+		.tool.active {
+			background: var(--accent);
+			border-color: var(--accent);
+			transform: translateY(0);
+			box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+		}
+		.tool.active svg {
+			stroke: #fff;
+		}
+		.tool svg {
+			width: 20px;
+			height: 20px;
+			fill: none;
+			stroke: #374151;
+			stroke-width: 2;
+			color: var(--icon-color);
+		}
+		.tool.select, .tool.color, .tool.file {
+			padding: 0;
+			overflow: hidden;
+		}
+		.tool select {
+			min-width: 100px;
+			border: none;
+			background: transparent;
+			font-size: 14px;
+			color: var(--icon-color);
+		}
+		.tool select, .tool input[type=color], .tool input[type=file] {
+			width: 100%;
+			height: 100%;
+			border: none;
+			background: transparent;
+			cursor: pointer;
+		}
+		.tool select option {
+			padding: 2px 6px;
+		}
+		.tool input[type=color] {
+			width: 28px;
+			height: 28px;
+		}
+		.tool.file input[type=file] {
+			display: none;
+		}
+
+		.modal {
+			display: none;
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100%;
+			height: 100%;
+			background: rgba(0, 0, 0, .5);
+			align-items: center;
+			justify-content: center;
+		}
+		.modal-content {
+			transform: scale(0.95);
+			opacity: 0;
+			transition: transform .2s ease, opacity .2s ease;
+		}
+		.modal[style*="display: flex"] .modal-content {
+			transform: scale(1);
+			opacity: 1;
+		}
+		.modal-content {
+			background: #fff;
+			padding: 20px;
+			border-radius: 8px;
+			width: 300px;
+			box-sizing: border-box;
+		}
+		.modal-content label {
+			display: block;
+			margin-top: 8px;
+			font-size: 14px;
+		}
+		.modal-content input, .modal-content select {
+			width: 100%;
+			padding: 6px;
+			margin-top: 4px;
+			box-sizing: border-box;
+		}
+		.modal-content button {
+			margin-top: 12px;
+			padding: 6px 10px;
+		}
+
+		td.selected {
+			outline: 2px solid var(--accent);
+			outline-offset: -2px;
+			background: #eef6ff;
+			transition: background .2s, outline-color .2s;
+		}
+
+		.dark-mode {
+			--bg: #1e1e1e;
+			--panel: #2a2a2a;
+			--border: #3a3a3a;
+			--text: #f5f5f5;
+			--muted: #9ca3af;
+			--accent: #3b82f6;
+			--icon-color: #f5f5f5;
+		}
+		.dark-mode body {
+			background: var(--bg);
+			color: var(--text);
+			background: linear-gradient(135deg, #0f172a, #1e293b);
+		}
+		.dark-mode .toolbar {
+			background: var(--panel);
+			border-color: var(--border);
+			background: linear-gradient(135deg, #1e293b, #334155);
+		}
+		.dark-mode .tool {
+			background: #333;
+			border-color: var(--border);
+		}
+		.dark-mode .tool:hover {
+			background: #444;
+			border-color: #555;
+		}
+		.dark-mode .tool.active {
+			background: var(--accent);
+			border-color: var(--accent);
+		}
+		.dark-mode .tool.active svg {
+			stroke: #fff;
+		}
+		.dark-mode #editor {
+			background: var(--panel);
+			border-color: var(--border);
+			color: var(--text);
+		}
+		.dark-mode td.selected {
+			background: rgba(59,130,246,0.2);
+			outline-color: var(--accent);
+		}
+		.dark-mode .modal-content {
+			background: #2f2f2f;
+			color: var(--text);
+		}
+		.dark-mode select {
+			background: #2a2a2a;
+			color: #f5f5f5;
+			border-color: #3a3a3a;
+		}
+		.dark-mode option {
+			background: #2a2a2a;
+			color: #f5f5f5;
+		}
+
+		.theme-icon {
+			width: 20px;
+			height: 20px;
+			stroke: #374151;
+			stroke-width: 2;
+			fill: none;
+			position: absolute;
+			opacity: 0;
+			transform: scale(0.8) rotate(-90deg);
+			transition: opacity .3s ease, transform .3s ease;
+		}
+		#iconSun.active {
+			opacity: 1;
+			transform: scale(1) rotate(0deg);
+		}
+		#iconMoon.active {
+			opacity: 1;
+			transform: scale(1) rotate(0deg);
+		}
+
+		.tool svg {
+			width: 20px;
+			height: 20px;
+			stroke: var(--icon-color);
+			fill: none;
+			stroke-width: 2;
+			transition: stroke .3s ease;
+		}
+
+		select {
+			background: var(--panel);
+			color: var(--text);
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			padding: 4px 8px;
+			transition: background .3s, color .3s, border-color .3s;
+		}
+		select:hover, select:focus {
+			border-color: var(--accent);
+			outline: none;
+		}
+		option {
+			background: var(--panel);
+			color: var(--text);
+		}
+
+		.dropdown {
+			position: relative;
+			display: inline-block;
+		}
+		.dropbtn {
+			background: transparent;
+			border: none;
+			cursor: pointer;
+			width: 100%;
+			height: 40px;
+		}
+		.dropdown-content {
+			display: none;
+			position: absolute;
+			background: var(--panel);
+			border: 1px solid var(--border);
+			min-width: 180px;
+			box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+			z-index: 1000;
+			flex-direction: column;
+		}
+		.dropdown-content button {
+			background: none;
+			border: none;
+			text-align: left;
+			padding: 6px 12px;
+			width: 100%;
+			cursor: pointer;
+			color: var(--text);
+		}
+		.dropdown-content button:hover {
+			background: var(--bg);
+		}
+		.dropdown.show .dropdown-content {
+			display: flex;
+		}
+
+		#statusbar {
+			margin-top: 4px;
+			padding: 4px 8px;
+			font-size: 13px;
+			color: var(--muted);
+			background: var(--panel);
+			border: 1px solid var(--border);
+			border-top: none;
+			border-radius: 0 0 6px 6px;
+			display: flex;
+			gap: 12px;
+		}
+
+		mark.find-highlight {
+			background: yellow;
+			color: inherit;
+		}
+
+		.fullscreen-editor {
+			position: fixed !important;
+			top: 0; left: 0;
+			width: 100vw;
+			height: 100vh;
+			background: var(--bg);
+			z-index: 2000;
+			display: flex;
+			flex-direction: column;
+		}
+		.fullscreen-editor #content {
+			flex: 1;
+			display: flex;
+			flex-direction: column;
+		}
+		.fullscreen-editor #editor,
+		.fullscreen-editor #codeview {
+			flex: 1;
+			max-height: none;
+		}
+
+		#exportSeparator {
+			display: none;
+			margin-left: 8px;
+		}
+
+		@media (hover: none) {
+			.tool {
+				touch-action: manipulation;
+			}
+		}
+	</style>
+	<script src="DocumentBuilder.js"></script>
+</head>
+<body>
+	<div id="edithor">
+		<div class="toolbar" role="toolbar" aria-label="RichText eszközök">
+			<div class="tool" title="Címsor" aria-label="Címsor">
+				<select id="headerSelect" onchange="setHeader(this.value)">
+					<option value="">Címsor</option>
+					<option style="font-size: 2em; margin-top: 0.67em; margin-bottom: 0.67em; margin-left: 0; margin-right: 0; font-weight: bold;">h1</option>
+					<option style="font-size: 1.5em; margin-top: 0.83em; margin-bottom: 0.83em; margin-left: 0; margin-right: 0; font-weight: bold;">h2</option>
+					<option style="font-size: 1.17em; margin-top: 1em; margin-bottom: 1em; margin-left: 0; margin-right: 0; font-weight: bold;">h3</option>
+					<option style="margin-top: 1.33em; margin-bottom: 1.33em; margin-left: 0; margin-right: 0; font-weight: bold">h4</option>
+					<option style="font-size: .83em; margin-top: 1.67em; margin-bottom: 1.67em; margin-left: 0; margin-right: 0; font-weight: bold">h5</option>
+					<option style="font-size: .67em; margin-top: 2.33em; margin-bottom: 2.33em; margin-left: 0; margin-right: 0; font-weight: bold">h6</option>
+				</select>
+			</div>
+			<button class="tool" data-cmd="bold" title="Félkövér" aria-label="Félkövér" onclick="wrapSelection('strong')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M7 4h6a4 4 0 0 1 0 8H7zM7 12h7a4 4 0 0 1 0 8H7z"/></svg>
+			</button>
+			<button class="tool" data-cmd="italic" title="Dőlt" aria-label="Dőlt" onclick="wrapSelection('em')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M10 5h8M6 19h8M14 5l-4 14"/></svg>
+			</button>
+			<button class="tool" data-cmd="underline" title="Aláhúzott" aria-label="Aláhúzott" onclick="wrapSelection('u')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M6 4v8a6 6 0 1 0 12 0V4M4 20h16"/></svg>
+			</button>
+			<div class="tool" title="Betűtípus" aria-label="Betűtípus">
+				<select id="fontFamilySelect" onchange="setFont(this.value)">
+					<option style="font-family: Arial, Helvetica, sans-serif;">Arial</option>
+					<option style="font-family: Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;">Cambria</option>
+					<option style="font-family: 'Courier New', Courier, monospace;">Courier New</option>
+					<option style="font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;">Franklin Gothic Medium</option>
+					<option style="font-family: Georgia, 'Times New Roman', Times, serif;">Georgia</option>
+					<option style="font-family: 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;">Gill Sans</option>
+					<option style="font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;">Impact</option>
+					<option style="font-family: 'Lucida Sans', 'Lucida Sans Regular', 'Lucida Grande', 'Lucida Sans Unicode', Geneva, Verdana, sans-serif;">Lucida Sans</option>
+					<option style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">Segoe UI</option>
+					<option style="font-family: 'Times New Roman', Times, serif;">Times New Roman</option>
+					<option style="font-family: 'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;">Trebuchet MS</option>
+					<option style="font-family: Verdana, Geneva, Tahoma, sans-serif;">Verdana</option>
+				</select>
+			</div>
+			<div class="tool" title="Betűméret" aria-label="Betűméret">
+				<select id="fontSizeSelect" onchange="setFontSize(this.value)">
+					<option style="font-size: 12px;">12px</option>
+					<option style="font-size: 14px;">14px</option>
+					<option style="font-size: 16px;">16px</option>
+					<option style="font-size: 20px;">20px</option>
+					<option style="font-size: 24px;">24px</option>
+					<option style="font-size: 32px;">32px</option>
+				</select>
+			</div>
+			<div class="tool color" title="Betűszín" aria-label="Betűszín">
+				<input id="colorInput" type="color" onchange="setColor(this.value)">
+			</div>
+			<div class="tool color" title="Háttérszín" aria-label="Háttérszín">
+				<input id="bgColorInput" type="color" onchange="setBgColor(this.value)">
+			</div>
+			<button class="tool" data-align="left" title="Balra igazítás" aria-label="Balra igazítás" onclick="setAlign('left')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M4 12h10M4 18h16"/></svg>
+			</button>
+			<button class="tool" data-align="center" title="Középre igazítás" aria-label="Középre igazítás" onclick="setAlign('center')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M7 12h10M4 18h16"/></svg>
+			</button>
+			<button class="tool" data-align="right" title="Jobbra igazítás" aria-label="Jobbra igazítás" onclick="setAlign('right')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M10 12h10M4 18h16"/></svg>
+			</button>
+			<button class="tool" data-align="justify" title="Sorkizárt" aria-label="Sorkizárt" onclick="setAlign('justify')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+			</button>
+			<button class="tool" title="Behúzás növelése" onclick="increaseIndent()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M4 12h10M4 18h16M14 10l4 2-4 2z"/></svg>
+			</button>
+			<button class="tool" title="Behúzás csökkentése" onclick="decreaseIndent()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h16M4 12h10M4 18h16M10 10l-4 2 4 2z"/></svg>
+			</button>
+			<div class="tool" title="Sormagasság" aria-label="Sormagasság">
+				<select id="lineHeightSelect" onchange="setLineHeight(this.value)">
+					<option value="">Sormagasság</option>
+					<option style="line-height: 1;">1</option>
+					<option style="line-height: 1.25;">1.25</option>
+					<option style="line-height: 1.5;">1.5</option>
+					<option style="line-height: 1.75;">1.75</option>
+					<option style="line-height: 2;">2</option>
+				</select>
+			</div>
+			<button class="tool" title="Felsorolás" aria-label="Felsorolás" onclick="toggleList('ul')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M8 6h12M8 12h12M8 18h12"/><circle stroke="currentColor" cx="4" cy="6" r="1.5"/><circle stroke="currentColor" cx="4" cy="12" r="1.5"/><circle stroke="currentColor" cx="4" cy="18" r="1.5"/></svg>
+			</button>
+			<button class="tool" title="Számozott lista" aria-label="Számozott lista" onclick="toggleList('ol')">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M8 6h12M8 12h12M8 18h12"/><path stroke="currentColor" d="M4 5h0M3 11h2M3 17h2"/></svg>
+			</button>
+			<button class="tool" title="Hivatkozás" aria-label="Hivatkozás" onclick="openLinkModal()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M10 13a5 5 0 0 1 0-7l1-1a5 5 0 0 1 7 7l-1 1"/><path stroke="currentColor" d="M14 11a5 5 0 0 1 0 7l-1 1a5 5 0 0 1-7-7l1-1"/>
+				</svg>
+			</button>
+			<div class="tool dropdown" title="Táblázat" aria-label="Táblázat">
+				<button onclick="toggleTableMenu()" class="dropbtn">
+					<svg viewBox="0 0 24 24"><rect stroke="currentColor" x="4" y="5" width="16" height="14"/><path stroke="currentColor" d="M12 5v14M4 12h16"/></svg>
+				</button>
+				<div id="tableMenu" class="dropdown-content">
+					<button onclick="insertTable()">Táblázat beszúrása</button>
+					<button onclick="insertRow()">Sor beszúrása</button>
+					<button onclick="insertColumn()">Oszlop beszúrása</button>
+					<button onclick="deleteRow()">Sor törlése</button>
+					<button onclick="deleteColumn()">Oszlop törlése</button>
+					<button onclick="mergeSelectedCells()">Cellák egyesítése</button>
+					<button onclick="splitCell()">Cellák felosztása</button>
+					<button onclick="openTableModal()">Tulajdonságok…</button>
+				</div>
+			</div>
+			<button class="tool" title="Kép" aria-label="Kép" onclick="openImageModal()">
+				<svg viewBox="0 0 24 24"><rect stroke="currentColor" x="3" y="5" width="18" height="14"/><circle stroke="currentColor" cx="9" cy="10" r="2"/><path stroke="currentColor" d="M3 17l6-6 5 5 4-3 3 4"/></svg>
+			</button>
+			<button class="tool" title="Vízszintes vonal" aria-label="Vízszintes vonal" onclick="insertHr()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 12h16"/></svg>
+			</button>
+			<button class="tool" title="Előformázott blokk" aria-label="Előformázott blokk" onclick="insertPre()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 6h8M4 12h6M4 18h10M14 6l6 6-6 6"/></svg>
+			</button>
+			<button class="tool" title="Keresés / Csere" aria-label="Keresés / Csere" onclick="openFindReplaceModal()">
+				<svg viewBox="0 0 24 24">
+					<circle cx="11" cy="11" r="7" stroke="currentColor" fill="none"/>
+					<line x1="16" y1="16" x2="21" y2="21" stroke="currentColor"/>
+				</svg>
+			</button>
+			<button class="tool" title="Mentés" aria-label="Mentés" onclick="saveContent()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M4 20V4h12l4 4v12z"/><path stroke="currentColor" d="M8 4v6h8V4M8 14h8v6H8z"/></svg>
+			</button>
+			<button class="tool" title="Visszatöltés" aria-label="Visszatöltés" onclick="loadContent()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M12 5v6l4-4"/><path stroke="currentColor" d="M21 12a9 9 0 1 1-9-9"/></svg>
+			</button>
+			<button class="tool" title="Törlés" aria-label="Törlés" onclick="clearContent()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M3 6h18M8 6l1-2h6l1 2M6 6l1 14h10l1-14"/></svg>
+			</button>
+			<button class="tool" title="Export" aria-label="Export" onclick="openExportModal()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M6 4h8l4 4v12H6z"/><path stroke="currentColor" d="M14 4v6h4"/><path stroke="currentColor" d="M10 12h8M14 8l4 4-4 4"/></svg>
+			</button>
+			<button class="tool file" title="Import" aria-label="Import" onclick="document.getElementById('importFile').click()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M6 4h8l4 4v12H6z"/><path stroke="currentColor" d="M14 4v6h4"/><path stroke="currentColor" d="M12 12v6M9 15l3 3 3-3"/></svg>
+			</button>
+			<input type="file" id="importFile" accept="text/*" onchange="importContent(this)" style="display: none;">
+			<button class="tool" title="Kódnézet" aria-label="Kódnézet" onclick="toggleCodeView()">
+				<svg viewBox="0 0 24 24"><path stroke="currentColor" d="M9 18l-6-6 6-6M15 6l6 6-6 6"/></svg>
+			</button>
+			<button class="tool" title="Teljes képernyő" aria-label="Teljes képernyő" onclick="toggleFullscreen()">
+				<svg viewBox="0 0 24 24">
+					<path stroke="currentColor" d="M4 4h6v2H6v4H4zM20 4h-6v2h4v4h2zM4 20h6v-2H6v-4H4zM20 20h-6v-2h4v-4h2z"/>
+				</svg>
+			</button>
+			<button class="tool" id="themeToggle" title="Téma váltás" aria-label="Téma váltás" onclick="toggleDarkMode()">
+				<svg id="iconSun" class="theme-icon" viewBox="0 0 24 24">
+					<circle stroke="currentColor" cx="12" cy="12" r="5"/>
+					<path stroke="currentColor" d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+				</svg>
+				<svg id="iconMoon" class="theme-icon" viewBox="0 0 24 24">
+					<path stroke="currentColor" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+				</svg>
+			</button>
+		</div>
+		<div id="content">
+			<div id="editor" contenteditable="true">
+				<p>Itt kezdheted a szöveg szerkesztését...</p>
+			</div>
+			<textarea id="codeview" aria-label="HTML kód nézet"></textarea>
+			<div class="modal" id="tableModal">
+				<div class="modal-content">
+					<h3>Táblázat / Cella tulajdonságok</h3>
+					<label>Háttérszín: <input type="color" id="bgColor"></label>
+					<label>Keret vastagság (px): <input type="number" id="borderWidth" min="0" max="10"></label>
+					<label>Keret színe: <input type="color" id="borderColor"></label>
+					<label>Szöveg igazítás:
+					<select id="textAlign">
+						<option value="">(nincs változás)</option>
+						<option value="left">Balra</option>
+						<option value="center">Középre</option>
+						<option value="right">Jobbra</option>
+					</select>
+					</label>
+
+					<button onclick="applyTableProperties()">Alkalmaz</button>
+					<button onclick="closeTableModal()">Mégse</button>
+				</div>
+			</div>
+			<div class="modal" id="imageModal">
+				<div class="modal-content">
+					<h3>Kép beszúrása</h3>
+					<label>URL: <input type="url" id="imgUrl" placeholder="https://"></label>
+					<label>Megnyitás: <input type="file" id="imgFile" accept="image/*" onchange="openFile(event)"></label>
+					<div id="imgPreview" style="margin-top: 10px; text-align: center;"></div>
+					<label>Szélesség: <input type="text" id="imgWidth" placeholder="320px"></label>
+					<label>Magasság: <input type="text" id="imgHeight" placeholder="240px"></label>
+					<label>Igazítás:
+					<select id="imgAlign">
+						<option value="center">Középre</option>
+						<option value="left">Balra</option>
+						<option value="right">Jobbra</option>
+					</select>
+					</label>
+					<label>Aláírás: <input type="text" id="imgCaption"></label>
+					<button onclick="insertImageFromModal()">Beszúrás</button>
+					<button onclick="closeImageModal()">Mégse</button>
+				</div>
+			</div>
+			<div class="modal" id="linkModal">
+				<div class="modal-content">
+					<h3>Hivatkozás beszúrása / szerkesztése</h3>
+					<label>URL: <input type="url" id="linkUrl" placeholder="https://"></label>
+					<label>Szöveg: <input type="text" id="linkText" placeholder="Megjelenő szöveg"></label>
+					<label><input type="checkbox" id="linkNewTab"> Megnyitás új lapon</label>
+					<button onclick="insertOrUpdateLink()">Alkalmaz</button>
+					<button onclick="removeLink()">Link eltávolítása</button>
+					<button onclick="closeLinkModal()">Mégse</button>
+				</div>
+			</div>
+			<div class="modal" id="findReplaceModal">
+				<div class="modal-content">
+					<h3>Keresés és csere</h3>
+					<label>Keresett szöveg: <input type="text" id="findText"></label>
+					<label>Csere erre: <input type="text" id="replaceText"></label>
+					<button onclick="findNext()">Következő</button>
+					<button onclick="replaceOne()">Csere</button>
+					<button onclick="replaceAll()">Összes csere</button>
+					<button onclick="closeFindReplaceModal()">Bezár</button>
+				</div>
+			</div>
+			<div class="modal" id="exportModal">
+				<div class="modal-content">
+					<h3>Exportálás</h3>
+					<label>Fájl neve: <input type="text" id="exportFileName" placeholder="document"></label>
+					<label>Formátum:
+					<select id="exportFormat" onchange="showSeparator()">
+						<optgroup label="Document">
+							<option value="docx" selected="selected">Word Document - Office Open XML (.docx)</option>
+							<option value="odt">OpenDocument Text (.odt)</option>
+							<option value="pdf">Portable Document Format (.pdf)</option>
+						</optgroup>
+						<optgroup label="Spreadsheet">
+							<option value="xlsx">Excel Workbook - Office Open XML (.xlsx)</option>
+							<option value="ods">OpenDocument Spreadsheet (.ods)</option>
+							<option value="csv">Comma-separated values (.csv)</option>
+						</optgroup>
+						<optgroup label="Presentation">
+							<option value="pptx">PowerPoint Presentation - Office Open XML (.pptx)</option>
+							<option value="odp">OpenDocument Presentation (.odp)</option>
+						</optgroup>
+						<optgroup label="Technical">
+							<option value="html">Hypertext Markup Language (.html)</option>
+							<option value="xml">Extensible Markup Language (.xml)</option>
+							<option value="json">JavaScript Object Notation (.json)</option>
+						</optgroup>
+						<optgroup label="Other">
+							<option value="rtf">Rich Text Format (.rtf)</option>
+							<option value="markdown">Markdown (.md)</option>
+							<option value="txt">Plain Text (.txt)</option>
+							<option value="tex">LaTeX (.tex)</option>
+							<option value="epub" disabled="disabled">EPUB (.epub)</option>
+						</optgroup>
+					</select>
+					</label>
+					<select id="exportSeparator">
+						<optgroup label="Separator">
+							<option value="," selected>Comma (,)</option>
+							<option value=";">Semicolon (;)</option>
+							<option value="\t">Tabulator (	)</option>
+							<option value="\s">Space ( )</option>
+							<option value=":">Colon (:)</option>
+							<option value="|">Vertical bar (|)</option>
+							<option value="#">Number sign (#)</option>
+						</optgroup>
+					</select>
+					<button onclick="exportDocument()">Exportálás</button>
+					<button onclick="closeExportModal()">Mégse</button>
+				</div>
+			</div>
+		</div>
+		<div id="statusbar">
+			<span id="wordCount">Szavak: 0</span> |
+			<span id="lineInfo">Sor: 1</span> |
+			<span id="pathInfo">P</span>
+		</div>
+		<script>
+			function toggleFullscreen() {
+				const edithor = document.getElementById("edithor");
+				edithor.classList.toggle("fullscreen-editor");
+			}
+
+			function getBlockElementInSelection() {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return null;
+				let node = sel.anchorNode;
+				if (node.nodeType === 3) node = node.parentElement;
+				while (node && node !== document.getElementById("editor")) {
+					if (/^(P|DIV|LI|H[1-6]|PRE|BLOCKQUOTE)$/i.test(node.tagName)) {
+						return node;
+					}
+					node = node.parentElement;
+				}
+				return null;
+			}
+
+			function increaseIndent() {
+				const block = getBlockElementInSelection();
+				if (block) {
+					const current = parseInt(block.style.marginLeft || 0, 10);
+					block.style.marginLeft = (current + 20) + "px";
+				}
+			}
+
+			function decreaseIndent() {
+				const block = getBlockElementInSelection();
+				if (block) {
+					const current = parseInt(block.style.marginLeft || 0, 10);
+					const next = Math.max(0, current - 20);
+					block.style.marginLeft = next + "px";
+				}
+			}
+
+			function openFindReplaceModal() {
+				document.getElementById("findReplaceModal").style.display = "flex";
+				document.getElementById("findText").focus();
+			}
+
+			function closeFindReplaceModal() {
+				document.getElementById("findReplaceModal").style.display = "none";
+			}
+
+			function findNext() {
+				const query = document.getElementById("findText").value;
+				highlightAll(query);
+			}
+
+			function highlightAll(query) {
+				const editor = document.getElementById("editor");
+				if (!query) {
+					removeHighlights();
+					return;
+				}
+
+				removeHighlights();
+
+				const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT, null, false);
+				const regex = new RegExp(query, "gi");
+				let node;
+				while ((node = walker.nextNode())) {
+					const matches = [...node.nodeValue.matchAll(regex)];
+					if (matches.length) {
+					let parent = node.parentNode;
+					let lastIndex = 0;
+					const frag = document.createDocumentFragment();
+					matches.forEach(m => {
+						const start = m.index;
+						const end = start + m[0].length;
+						if (start > lastIndex) {
+							frag.appendChild(document.createTextNode(node.nodeValue.slice(lastIndex, start)));
+						}
+						const mark = document.createElement("mark");
+						mark.className = "find-highlight";
+						mark.textContent = node.nodeValue.slice(start, end);
+						frag.appendChild(mark);
+						lastIndex = end;
+					});
+					if (lastIndex < node.nodeValue.length) {
+						frag.appendChild(document.createTextNode(node.nodeValue.slice(lastIndex)));
+					}
+					parent.replaceChild(frag, node);
+					}
+				}
+			}
+
+			function removeHighlights() {
+				document.querySelectorAll("mark.find-highlight").forEach(mark => {
+					const text = document.createTextNode(mark.textContent);
+					mark.replaceWith(text);
+				});
+			}
+
+			function replaceOne() {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return;
+				const range = sel.getRangeAt(0);
+				const replacement = document.getElementById("replaceText").value;
+				range.deleteContents();
+				range.insertNode(document.createTextNode(replacement));
+			}
+
+			function replaceAll() {
+				const editor = document.getElementById("editor");
+				const find = document.getElementById("findText").value;
+				const replace = document.getElementById("replaceText").value;
+				if (!find) return;
+				editor.innerHTML = editor.innerHTML.replace(new RegExp(find, "gi"), replace);
+				highlightAll(find);
+			}
+
+			function openExportModal() {
+				document.getElementById("exportModal").style.display = "flex";
+			}
+
+			function exportDocument() {
+				const fileNameInput = document.getElementById("exportFileName");
+				const formatSelect = document.getElementById("exportFormat");
+				const fileName = fileNameInput.value.trim() || "document";
+				const format = formatSelect.value;
+
+				generate(format);
+			}
+
+			function closeExportModal() {
+				document.getElementById("exportModal").style.display = "none";
+			}
+
+			function showSeparator() {
+				if (document.getElementById("exportFormat").value === "csv") {
+					document.getElementById("exportSeparator").style.display = "inline-block";
+					return;
+				} else {
+					document.getElementById("exportSeparator").style.display = "none";
+				}
+			}
+
+			async function generate(type) {
+				var watermark = {
+					text: "Próba",
+					size: 70,
+					height: 100,
+					width: 100,
+					angle: -45,
+					stroke: true,
+					color: "7b7b7b",
+					opacity: 0.3
+				};
+
+				var TOC = {
+					generate: false,
+					label: "Table of Contents",
+					level: 3
+				}
+
+				var properties = {
+					orientation: "portrait",
+					format: "a4",
+					margin: "thin",
+					toc: false
+				};
+
+				var meta = {
+					title: "Test Document",
+					subject: "A simple test document generated by PDFBuilder - Subject.",
+					description: "A simple test document generated by PDFBuilder.",
+					creator: "Robs",
+					keywords: "test, pdfbuilder, javascript",
+					generator: "PDFBuilder.js"
+				};
+
+				var content = document.getElementById("editor");
+				var documentContent = {
+					headerTop: content.getElementsByTagName("header")[0] || null,
+					top: content.getElementsByTagName("article")[0] || null,
+					footerTop: content.getElementsByTagName("footer")[0] || null,
+					header: content.getElementsByTagName("header")[0] || null,
+					body: content.getElementsByTagName("main")[0] || content,
+					footer: content.getElementsByTagName("footer")[0] || null
+				};
+
+				var documentProperties = {
+					name: meta.title,
+					orientation: properties.orientation,
+					size: properties.format,
+					margin: properties.margin,
+					topPage: properties.toc,
+					content: documentContent,
+					meta: meta,
+					TOC: TOC,
+					watermark: watermark,
+					language: "en-US"
+				};
+//<progress id="docProgress" value="0" max="100"></progress>
+//<div id="statusText"></div>
+//<div id="errorText" style="color:red"></div>
+
+/*builder.on("progress", (percent, message) => {
+  document.getElementById("docProgress").value = percent;
+  document.getElementById("statusText").textContent = message;
+});
+
+builder.on("error", message => {
+  document.getElementById("errorText").textContent = "Hiba: " + message;
+});
+builder.build();*/
+
+/*
+builder.on("progress", (percent, msg) => {
+  console.log(percent + "% - " + msg);
+});
+
+builder.on("warning", msg => {
+  console.warn("Figyelmeztetés:", msg);
+});
+
+builder.on("error", msg => {
+  console.error("Hiba:", msg);
+});
+
+builder.on("fatal", msg => {
+  console.error("Végzetes hiba:", msg);
+  alert("Generálás leállt: " + msg);
+});
+
+builder.on("cancel", msg => {
+  console.log(msg);
+});
+
+// Generálás indítása
+builder.build();
+
+// Felhasználó megszakítja
+setTimeout(() => builder.cancel(), 2000);
+
+
+<button id="generateBtn">Generate</button>
+
+<div id="modal" style="display:none; position:fixed; top:20%; left:30%; background:#fff; padding:20px; border:1px solid #ccc;">
+  <progress id="progressBar" value="0" max="100"></progress>
+  <div id="statusText"></div>
+  <div id="errorText" style="color:red"></div>
+  <button id="cancelBtn">Cancel</button>
+</div>
+document.getElementById("generateBtn").addEventListener("click", () => {
+  const builder = new RTFBuilder(input);
+
+  // Modal megjelenítése
+  document.getElementById("modal").style.display = "block";
+
+  builder.on("progress", (percent, msg) => {
+    document.getElementById("progressBar").value = percent;
+    document.getElementById("statusText").textContent = msg;
+  });
+
+  builder.on("error", msg => {
+    document.getElementById("errorText").textContent = msg;
+  });
+
+  builder.on("cancel", msg => {
+    document.getElementById("statusText").textContent = msg;
+    document.getElementById("modal").style.display = "none";
+  });
+
+  builder.on("success", result => {
+    document.getElementById("modal").style.display = "none";
+    // Itt triggerelhetsz bármit: letöltés, feltöltés, stb.
+    console.log("Generálás sikeres, Blob:", result);
+  });
+
+  document.getElementById("cancelBtn").onclick = () => builder.cancel();
+
+  builder.build();
+});
+
+*/
+				let builder = null;
+				switch(type) {
+					case 'docx':
+						builder = new DOCXBuilder(documentProperties);
+						break;
+					case 'xlsx':
+						builder = new XLSXBuilder(documentProperties);
+						break;
+					case 'pptx':
+						builder = new PPTXBuilder(documentProperties);
+						break;
+					case 'odt':
+						builder = new ODTBuilder(documentProperties);
+						break;
+					case 'ods':
+						builder = new ODSBuilder(documentProperties);
+						break;
+					case 'odp':
+						builder = new ODPBuilder(documentProperties);
+						break;
+					case 'pdf':
+						builder = new PDFBuilder(documentProperties);
+						break;
+					case 'csv':
+						builder = new CSVBuilder(documentProperties, document.getElementById("exportSeparator").value);
+						break;
+					case 'html':
+						builder = new HTMLBuilder(documentProperties);
+						break;
+					case 'xml':
+						builder = new XMLBuilder(documentProperties);
+						break;
+					case 'json':
+						builder = new JSONBuilder(documentProperties);
+						break;
+					case 'markdown':
+						builder = new MarkdownBuilder(documentProperties);
+						break;
+					case 'rtf':
+						builder = new RTFBuilder(documentProperties);
+						break;
+					case 'txt':
+						builder = new PlainBuilder(documentProperties);
+						break;
+					case 'tex':
+						builder = new LaTeXBuilder(documentProperties);
+						break;
+					case 'epub':
+						builder = new EPUBBuilder(documentProperties);
+						break;
+				}
+
+				if (builder) {
+					await builder.init();
+					await builder.build();
+					await builder.download();
+				}
+			}
+
+			const editor = document.getElementById("editor");
+			editor.addEventListener("selectionchange", updateStatusBar);
+			editor.addEventListener("keyup", updateStatusBar);
+
+			function updateStatusBar() {
+				const editor = document.getElementById("editor");
+				if (!editor) return;
+
+				const text = editor.innerText.trim();
+				document.getElementById("wordCount").textContent =
+				"Szavak: " + (text ? text.split(/\s+/).length : 0);
+
+				const sel = window.getSelection();
+				let node = sel.focusNode;
+				let path = [];
+				while (node && node !== editor) {
+					if (node.nodeType === 1) path.unshift(node.tagName);
+					node = node.parentElement;
+				}
+				document.getElementById("pathInfo").textContent = path.join(" > ") || "–";
+
+				const range = sel.rangeCount ? sel.getRangeAt(0) : null;
+				if (range) {
+					let container = range.startContainer;
+					while (container && container !== editor && !container.previousSibling) {
+						container = container.parentNode;
+					}
+					let line = 1;
+					let node2 = editor.firstChild;
+					while (node2 && node2 !== container) {
+						if (node2.nodeType === 1 && (node2.tagName === "P" || node2.tagName === "DIV" || node2.tagName === "BR")) {
+							line++;
+						}
+						node2 = node2.nextSibling;
+					}
+					document.getElementById("lineInfo").textContent = "Sor: " + line;
+				}
+			}
+
+			let lastLinkRange = null;
+
+			function openLinkModal() {
+				saveSelection();
+				lastLinkRange = savedRange ? savedRange.cloneRange() : null;
+
+				const sel = window.getSelection();
+				if (sel.rangeCount) {
+					const node = sel.focusNode?.parentElement;
+					if (node && node.tagName === "A") {
+						document.getElementById("linkUrl").value = node.getAttribute("href") || "";
+						document.getElementById("linkText").value = node.textContent || "";
+						document.getElementById("linkNewTab").checked = node.getAttribute("target") === "_blank";
+					} else {
+						document.getElementById("linkUrl").value = "";
+						document.getElementById("linkText").value = sel.toString();
+						document.getElementById("linkNewTab").checked = false;
+					}
+				}
+
+				document.getElementById("linkModal").style.display = "flex";
+			}
+
+			function closeLinkModal() {
+				document.getElementById("linkModal").style.display = "none";
+			}
+
+			function insertOrUpdateLink() {
+				const url = document.getElementById("linkUrl").value.trim();
+				const text = document.getElementById("linkText").value.trim() || url;
+				const newTab = document.getElementById("linkNewTab").checked;
+
+				if (!url) {
+					closeLinkModal();
+					return;
+				}
+
+				const editor = document.getElementById("editor");
+				editor.focus();
+
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				if (lastLinkRange) sel.addRange(lastLinkRange);
+
+				if (sel.rangeCount) {
+					const range = sel.getRangeAt(0);
+
+					let node = sel.focusNode?.parentElement;
+					if (node && node.tagName === "A") {
+						node.setAttribute("href", url);
+						node.textContent = text;
+						if (newTab) node.setAttribute("target", "_blank");
+						else node.removeAttribute("target");
+					} else {
+						const a = document.createElement("a");
+						a.href = url;
+						a.textContent = text;
+						if (newTab) a.target = "_blank";
+						range.deleteContents();
+						range.insertNode(a);
+					}
+				}
+
+				closeLinkModal();
+				lastLinkRange = null;
+			}
+
+			function removeLink() {
+				const sel = window.getSelection();
+				if (sel.rangeCount) {
+					let node = sel.focusNode?.parentElement;
+					if (node && node.tagName === "A") {
+						const textNode = document.createTextNode(node.textContent);
+						node.replaceWith(textNode);
+					}
+				}
+				closeLinkModal();
+				lastLinkRange = null;
+			}
+
+			function toggleTableMenu() {
+				document.querySelector(".dropdown").classList.toggle("show");
+			}
+
+			window.addEventListener("click", function(e) {
+				if (!e.target.closest(".dropdown")) {
+					document.querySelectorAll(".dropdown.show").forEach(dd => dd.classList.remove("show"));
+				}
+			});
+
+			function deleteRow() {
+				const selected = getSelectedCells();
+				if (selected.length) {
+					const rows = [...new Set(selected.map(td => td.parentElement))];
+					rows.forEach(tr => tr.remove());
+				} else {
+					const cell = getCurrentCell();
+					if (cell) {
+						cell.parentElement.remove();
+					}
+				}
+			}
+
+			function deleteColumn() {
+				const selected = getSelectedCells();
+				if (selected.length) {
+					const table = selected[0].closest("table");
+					const colIndexes = [...new Set(selected.map(td => td.cellIndex))].sort((a,b)=>b-a);
+					colIndexes.forEach(idx => {
+						[...table.rows].forEach(tr => {
+							if (tr.cells[idx]) tr.deleteCell(idx);
+						});
+					});
+				} else {
+					const cell = getCurrentCell();
+					if (cell) {
+						const idx = cell.cellIndex;
+						const table = cell.closest("table");
+						[...table.rows].forEach(tr => {
+							if (tr.cells[idx]) tr.deleteCell(idx);
+						});
+					}
+				}
+			}
+
+			function toggleDarkMode() {
+				const body = document.body;
+				const sun = document.getElementById("iconSun");
+				const moon = document.getElementById("iconMoon");
+
+				body.classList.toggle("dark-mode");
+
+				if (body.classList.contains("dark-mode")) {
+					sun.classList.remove("active");
+					moon.classList.add("active");
+					localStorage.setItem("theme", "dark");
+				} else {
+					moon.classList.remove("active");
+					sun.classList.add("active");
+					localStorage.setItem("theme", "light");
+				}
+			}
+
+			editor.addEventListener("dragover", e => e.preventDefault());
+
+			editor.addEventListener("drop", e => {
+				e.preventDefault();
+				const file = e.dataTransfer.files[0];
+				if (file && file.type.startsWith("image/")) {
+					const reader = new FileReader();
+					reader.onload = ev => {
+						insertHtml(`<img src="${ev.target.result}" alt="">`);
+					};
+					reader.readAsDataURL(file);
+				}
+			});
+
+			window.addEventListener("DOMContentLoaded", () => {
+				const theme = localStorage.getItem("theme");
+				const sun = document.getElementById("iconSun");
+				const moon = document.getElementById("iconMoon");
+
+				if (theme === "dark") {
+					document.body.classList.add("dark-mode");
+					moon.classList.add("active");
+				} else {
+					sun.classList.add("active");
+				}
+			});
+
+			window.addEventListener("DOMContentLoaded", () => {
+				const editor = document.getElementById("editor");
+				editor.addEventListener("keyup", saveSelection);
+				editor.addEventListener("mouseup", saveSelection);
+				editor.addEventListener("touchend", saveSelection);
+			});
+
+			function highlightSelectedCells() {
+				const table = getCurrentCell()?.closest("table");
+				if (!table) return;
+				table.querySelectorAll("td").forEach(td => td.classList.remove("selected"));
+				const selected = getSelectedCells();
+				selected.forEach(td => td.classList.add("selected"));
+			}
+
+			editor.addEventListener("selectionchange", highlightSelectedCells);
+
+			function updateImagePreview() {
+				const url = document.getElementById("imgUrl").value.trim();
+				const file = document.getElementById("imgFile").value;
+				const width = document.getElementById("imgWidth").value.trim();
+				const height = document.getElementById("imgHeight").value.trim();
+				const align = document.getElementById("imgAlign").value;
+				const caption = document.getElementById("imgCaption").value.trim();
+
+				if (!url) {
+					document.getElementById("imgPreview").innerHTML = "";
+					return;
+				}
+
+				let style = "max-height: 100px;";
+				if (width) style += "width: " + width + ";";
+				if (height) style += "height: " + height + ";";
+				if (align === "left") style += "/*float: left;*/ margin: 6px;";
+				else if (align === "right") style += "/*float: right;*/ margin: 6px;";
+
+				let html = "<figure style='text-align: " + align + ";'><img src='" + url + "' style='" + style + "'>";
+				if (caption) html += "<figcaption>" + caption + "</figcaption>";
+				html += `</figure>`;
+
+				document.getElementById("imgPreview").innerHTML = html;
+			}
+
+			["imgUrl", "imgFile", "imgWidth", "imgHeight", "imgAlign", "imgCaption"].forEach(id => {
+				document.getElementById(id).addEventListener("input", updateImagePreview);
+			});
+
+			let savedRange = null;
+			function saveSelection() {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return;
+				const r = sel.getRangeAt(0);
+				const editor = document.getElementById("editor");
+				const container = r.commonAncestorContainer.nodeType === 1 ? r.commonAncestorContainer : r.commonAncestorContainer.parentElement;
+				if (editor.contains(container)) {
+					savedRange = r.cloneRange();
+				}
+			}
+
+			function openImageModal() {
+				saveSelection();
+				document.getElementById("imageModal").style.display = "flex";
+			}
+
+			function restoreSelectionOrMoveToEnd() {
+				const editor = document.getElementById("editor");
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				if (savedRange) {
+					sel.addRange(savedRange);
+				} else {
+					const r = document.createRange();
+					r.selectNodeContents(editor);
+					r.collapse(false);
+					sel.addRange(r);
+				}
+			}
+
+			function insertHtml(html) {
+				if (typeof codeMode !== "undefined" && codeMode) {
+					alert("Kódnézetben nem lehet beszúrni. Válts vissza a szerkesztő nézetre.");
+					return;
+				}
+
+				const editor = document.getElementById("editor");
+				editor.focus();
+
+				restoreSelectionOrMoveToEnd();
+
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return;
+				const range = sel.getRangeAt(0);
+
+				try {
+					range.deleteContents();
+					range.insertNode(range.createContextualFragment(html));
+				} catch {
+					document.execCommand("insertHTML", false, html);
+				}
+
+				savedRange = null;
+			}
+
+			function insertTable() {
+				let html = "<table border='1' style='border-collapse: collapse; width: 100%;'><tr><td>&nbsp;</td><td>&nbsp;</td></tr><tr><td>&nbsp;</td><td>&nbsp;</td></tr></table><br/>";
+				insertHtml(html);
+			}
+
+			function insertRow() {
+				const td = getCurrentCell();
+				if (!td) return;
+				const tr = td.parentElement;
+				const clone = tr.cloneNode(true);
+				clone.querySelectorAll("td").forEach(c => c.innerHTML = "&nbsp;");
+				tr.parentElement.insertBefore(clone, tr.nextSibling);
+			}
+
+			function insertColumn() {
+				const td = getCurrentCell();
+				if (!td) return;
+				const table = td.closest("table");
+				const index = [...td.parentElement.children].indexOf(td);
+				table.querySelectorAll("tr").forEach(tr => {
+					const cell = document.createElement("td"); cell.innerHTML = "&nbsp;";
+					tr.insertBefore(cell, tr.children[index + 1]);
+				});
+			}
+
+			function splitCell() {
+				const td = getCurrentCell();
+				if (!td) return;
+				const rs = td.rowSpan || 1, cs = td.colSpan || 1;
+				td.rowSpan = 1; td.colSpan = 1;
+				const tr = td.parentElement, table = tr.parentElement;
+				for (let r = 0; r < rs; r++) {
+					const row = table.rows[tr.rowIndex+r];
+					for (let c = 0; c < cs; c++) {
+						if (r === 0 && c === 0) continue;
+						const newTd = document.createElement("td"); newTd.innerHTML = "&nbsp;";
+						row.insertBefore(newTd, row.cells[td.cellIndex + 1]);
+					}
+				}
+			}
+
+			let selecting = false;
+			let startCell = null;
+
+			function clearSelection() {
+				document.querySelectorAll("td.selected").forEach(td => td.classList.remove("selected"));
+			}
+
+			function buildCellMatrix(table) {
+				const matrix = [];
+				for (let r = 0; r < table.rows.length; r++) {
+					let col = 0;
+					matrix[r] = matrix[r] || [];
+					for (const cell of table.rows[r].cells) {
+						while (matrix[r][col]) col++;
+						const rs = cell.rowSpan || 1;
+						const cs = cell.colSpan || 1;
+						for (let rr = 0; rr < rs; rr++) {
+							for (let cc = 0; cc < cs; cc++) {
+								matrix[r+rr] = matrix[r+rr] || [];
+								matrix[r+rr][col+cc] = cell;
+							}
+						}
+						col += cs;
+					}
+				}
+				return matrix;
+			}
+
+			function highlightRect(td1, td2) {
+				const table = td1.closest("table");
+				const matrix = buildCellMatrix(table);
+
+				let pos1, pos2;
+				for (let r = 0; r < matrix.length; r++) {
+					for (let c = 0; c < matrix[r].length; c++) {
+						if (matrix[r][c] === td1) pos1 = {r, c};
+						if (matrix[r][c] === td2) pos2 = {r, c};
+					}
+				}
+				if (!pos1 || !pos2) return;
+
+				const minR = Math.min(pos1.r, pos2.r), maxR = Math.max(pos1.r, pos2.r);
+				const minC = Math.min(pos1.c, pos2.c), maxC = Math.max(pos1.c, pos2.c);
+
+				for (let r = minR; r <= maxR; r++) {
+					for (let c = minC; c <= maxC; c++) {
+						const cell = matrix[r][c];
+						if (cell) cell.classList.add("selected");
+					}
+				}
+			}
+
+			function getSelectedCells() {
+				return [...document.querySelectorAll("td.selected")];
+			}
+
+			function mergeSelectedCells() {
+				const cells = getSelectedCells();
+				if (cells.length < 2) {
+					alert("Jelölj ki több cellát!");
+					return;
+				}
+
+				const rows = cells.map(td => td.parentElement.rowIndex);
+				const cols = cells.map(td => td.cellIndex);
+				const minRow = Math.min(...rows), maxRow = Math.max(...rows);
+				const minCol = Math.min(...cols), maxCol = Math.max(...cols);
+
+				const table = cells[0].closest("table");
+				const master = table.rows[minRow].cells[minCol];
+				master.rowSpan = maxRow - minRow + 1;
+				master.colSpan = maxCol - minCol + 1;
+
+				cells.forEach(td => {
+					if (td !== master) td.remove();
+				});
+				clearSelection();
+			}
+
+			function getSelectionRect() {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return null;
+				const range = sel.getRangeAt(0);
+				const rects = Array.from(range.getClientRects());
+				if (rects.length === 0) return null;
+				const r = rects.reduce((acc, rc) => ({
+					left: Math.min(acc.left, rc.left),
+					top: Math.min(acc.top, rc.top),
+					right: Math.max(acc.right, rc.right),
+					bottom: Math.max(acc.bottom, rc.bottom)
+				}), { left: Infinity, top: Infinity, right: -Infinity, bottom: -Infinity });
+				return { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top};
+			}
+
+			function rectsIntersect(a,b) { return !(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y); }
+
+			function getCurrentCell() {
+				const sel = window.getSelection();
+				if (sel.rangeCount) {
+					let node = sel.anchorNode;
+					while (node && node.nodeName !== "TD") node = node.parentElement;
+					if (node) return node;
+				}
+				const selected = document.querySelector("td.selected");
+				return selected || null;
+			}
+
+			function applyToCellsOrDefault(callback, fallback) {
+				const selected = getSelectedCells();
+				if (selected.length) {
+					selected.forEach(td => callback(td));
+					return true;
+				}
+				const cell = getCurrentCell();
+				if (cell) {
+					callback(cell);
+					return true;
+				}
+				if (fallback) fallback();
+				return false;
+			}
+
+			let lastSelectedCells = [];
+			function openTableModal() {
+				lastSelectedCells = getSelectedCells();
+				if (!lastSelectedCells.length) {
+					const cell = getCurrentCell();
+					if (cell) lastSelectedCells = [cell];
+				}
+				document.getElementById("tableModal").style.display = "flex";
+			}
+
+			function closeTableModal() {
+				document.getElementById("tableModal").style.display = "none";
+			}
+
+			function applyTableProperties() {
+				const bg = document.getElementById("bgColor").value;
+				const bw = document.getElementById("borderWidth").value;
+				const bc = document.getElementById("borderColor").value;
+				const ta = document.getElementById("textAlign").value;
+
+				(lastSelectedCells || []).forEach(td => {
+					if (bg) td.style.backgroundColor = bg;
+					if (bw) td.style.borderWidth = bw + "px";
+					if (bc) td.style.borderColor = bc;
+					if (ta) td.style.textAlign = ta;
+				});
+
+				closeTableModal();
+				lastSelectedCells = [];
+			}
+
+			function closeImageModal() {
+				document.getElementById("imageModal").style.display = "none";
+			}
+
+			function insertImageFromModal() {
+				const url = document.getElementById("imgUrl").value.trim();
+				if (!url) {
+					alert("Adj meg egy URL-t!");
+					return;
+				}
+				const width = document.getElementById("imgWidth").value.trim();
+				const height = document.getElementById("imgHeight").value.trim();
+				const align = document.getElementById("imgAlign").value;
+				const caption = document.getElementById("imgCaption").value.trim();
+				const alt = caption || "";
+
+				let imgStyle = "";
+				if (width) imgStyle += "width: " + width + ";";
+				if (height) imgStyle += "height: " + height + ";";
+				if (align === "left") imgStyle += "float: left; margin: 6px;";
+				else if (align === "right") imgStyle += "float: right; margin: 6px;";
+
+				const figureStyle = "text-align: " + align + ";";
+				let html = "<figure style='" + figureStyle + "'><img src='" + url + "' alt='" + alt + "' style='" + imgStyle + "'>";
+				if (caption) html += "<figcaption>" + caption + "</figcaption>";
+				html += "</figure>";
+
+				insertHtml(html);
+				closeImageModal();
+
+				document.getElementById("imgUrl").value = "";
+				document.getElementById("imgWidth").value = "";
+				document.getElementById("imgHeight").value = "";
+				document.getElementById("imgAlign").value = "center";
+				document.getElementById("imgCaption").value = "";
+			}
+
+			function setLineHeight(value) {
+				if (!value) return;
+				applyToCellsOrDefault(
+					td => td.style.lineHeight = value,
+					() => {
+						const range = getSelectionRangeOrNull();
+						if (!range) return;
+						const parent = range.commonAncestorContainer.nodeType === 1
+						? range.commonAncestorContainer
+						: range.commonAncestorContainer.parentElement;
+						if (parent) parent.style.lineHeight = value;
+					}
+				);
+			}
+
+			function saveContent() {
+				localStorage.setItem("editorContent", document.getElementById("editor").innerHTML);
+				alert("Elmentve!");
+			}
+
+			function loadContent() {
+				const h = localStorage.getItem("editorContent");
+				if (h) {
+					document.getElementById("editor").innerHTML = h;
+				} else {
+					alert("Nincs elmentett tartalom.");
+				}
+			}
+
+			function clearContent() {
+				if (confirm("Biztosan törlöd?")) {
+					localStorage.removeItem("editorContent");
+					alert("Törölve!");
+				}
+			}
+
+			let codeMode = false;
+			function toggleCodeView() {
+				const e = document.getElementById("editor"), c = document.getElementById("codeview");
+				if (!codeMode) {
+					c.value = e.innerHTML;
+					e.style.display = "none";
+					c.style.display = "block";
+					codeMode = true;
+				} else {
+					e.innerHTML = c.value;
+					c.style.display = "none";
+					e.style.display = "block";
+					codeMode = false;
+				}
+			}
+
+			function exportContent() {
+				const html = document.getElementById("editor").innerHTML;
+				const blob = new Blob([html], { type: "text/html" });
+				const url = URL.createObjectURL(blob);
+				const a = document.createElement("a");
+				a.href = url;
+				a.download = "content.html";
+				a.click();
+				URL.revokeObjectURL(url);
+			}
+
+			function importContent(input) {
+				const file = input.files[0];
+				if (!file) return;
+				const reader = new FileReader();
+				reader.onload = e => {
+					document.getElementById("editor").innerHTML = e.target.result;
+//					alert("Importálva!");
+				};
+				reader.readAsText(file);
+			}
+
+			function getSelectionRangeOrNull() {
+				const sel = window.getSelection();
+				if (!sel || !sel.rangeCount) return null;
+				return sel.getRangeAt(0);
+			}
+
+			function applyInlineStyle(styleProp, value) {
+				const range = getSelectionRangeOrNull();
+				if (!range || range.collapsed) return;
+				const wrapper = document.createElement("span");
+				wrapper.style[styleProp] = value;
+				const contents = range.extractContents();
+				wrapper.appendChild(contents);
+				range.insertNode(wrapper);
+
+				mergeAdjacentSpans(wrapper, styleProp, value);
+			}
+
+			function mergeAdjacentSpans(node, styleProp, value) {
+				const parent = node.parentNode;
+				if (!parent) return;
+
+				function canMerge(a, b) {
+					return a && b && a.nodeName === "SPAN" && b.nodeName === "SPAN"
+						&& a.style[styleProp] === value && b.style[styleProp] === value;
+				}
+
+				if (canMerge(node.previousSibling, node)) {
+					const left = node.previousSibling;
+					while (node.firstChild) left.appendChild(node.firstChild);
+					node.remove();
+					node = left;
+				}
+
+				if (canMerge(node, node.nextSibling)) {
+					const right = node.nextSibling;
+					while (right.firstChild) node.appendChild(right.firstChild);
+					right.remove();
+				}
+			}
+
+			function wrapSelectionWithTag(tagName) {
+				const range = getSelectionRangeOrNull();
+				if (!range || range.collapsed) return;
+				const wrapper = document.createElement(tagName);
+				try {
+					range.surroundContents(wrapper);
+				} catch {
+					const frag = range.extractContents();
+					wrapper.appendChild(frag);
+					range.insertNode(wrapper);
+				}
+			}
+
+			function setBlockTag(tagName) {
+				const range = getSelectionRangeOrNull();
+				if (!range) return;
+				const block = getNearestBlockAncestor(range);
+				if (!block) return;
+				if (block.tagName?.toLowerCase() === tagName.toLowerCase()) return;
+
+				const replacement = document.createElement(tagName);
+
+				while (block.firstChild) replacement.appendChild(block.firstChild);
+
+				const style = block.getAttribute("style");
+				if (style) replacement.setAttribute("style", style);
+				block.parentNode.replaceChild(replacement, block);
+			}
+
+			function getNearestBlockAncestor(range) {
+				let node = range.commonAncestorContainer;
+				if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+				while (node && node !== document && !isBlock(node)) {
+					node = node.parentNode;
+				}
+				return node;
+			}
+
+			function isBlock(el) {
+				if (!el || el.nodeType !== 1) return false;
+				const display = getComputedStyle(el).display;
+				return display === "block" || display === "table" || display === "list-item";
+			}
+
+			function setBlockAlignment(value) {
+				const range = getSelectionRangeOrNull();
+				if (!range) return;
+				const block = getNearestBlockAncestor(range);
+				if (!block) return;
+				block.style.textAlign = value;
+			}
+
+			function insertHorizontalRule() {
+				const range = getSelectionRangeOrNull();
+				if (!range) return;
+				const hr = document.createElement("hr");
+				range.deleteContents();
+				range.insertNode(hr);
+				range.setStartAfter(hr);
+				range.setEndAfter(hr);
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+
+			function setPreformatted() {
+				setBlockTag("pre");
+			}
+
+			function wrapSelection(tag) {
+				wrapSelectionWithTag(tag);
+			}
+
+			function setFont(font) {
+				if (!font) return;
+				applyToCellsOrDefault(
+					td => td.style.fontFamily = font,
+					() => applyInlineStyle("fontFamily", font)
+				);
+			}
+
+			function setFontSize(size) {
+				if (!size) return;
+				applyToCellsOrDefault(
+					td => td.style.fontSize = size,
+					() => applyInlineStyle("fontSize", size)
+				);
+			}
+
+			function setColor(c) {
+				if (!c) return;
+				applyToCellsOrDefault(
+					td => td.style.color = c,
+					() => applyInlineStyle("color", c)
+				);
+			}
+
+			function setBgColor(c) {
+				if (!c) return;
+				applyToCellsOrDefault(
+					td => td.style.backgroundColor = c,
+					() => applyInlineStyle("backgroundColor", c)
+				);
+			}
+
+			function setHeader(tag) {
+				if (!tag) return;
+				const range = getSelectionRangeOrNull();
+				if (!range) return;
+
+				if (!range.collapsed) {
+					const frag = range.extractContents();
+					const header = document.createElement(tag);
+					header.appendChild(frag);
+					range.insertNode(header);
+
+					const sel = window.getSelection();
+					sel.removeAllRanges();
+					const r = document.createRange();
+					r.selectNodeContents(header);
+					r.collapse(false);
+					sel.addRange(r);
+				} else {
+					setBlockTag(tag);
+				}
+			}
+
+			function insertHr() {
+				insertHorizontalRule();
+			}
+
+			function insertPre() {
+				setPreformatted();
+			}
+
+			function toggleList(type) {
+				const range = getSelectionRangeOrNull();
+				if (!range) return;
+				const block = getNearestBlockAncestor(range);
+				if (!block) return;
+
+				const listTag = type === "ul" ? "ul" : "ol";
+
+				if (block.tagName && (block.tagName.toLowerCase() === "li" || block.tagName.toLowerCase() === listTag)) {
+					const list = block.tagName.toLowerCase() === "li" ? block.parentNode : block;
+					const parent = list.parentNode;
+					while (list.firstChild) {
+						const li = list.firstChild;
+						if (li.tagName?.toLowerCase() === "li") {
+							const p = document.createElement("p");
+							while (li.firstChild) p.appendChild(li.firstChild);
+							parent.insertBefore(p, list);
+						} else {
+							parent.insertBefore(li, list);
+						}
+					}
+					list.remove();
+					return;
+				}
+
+				const contents = range.extractContents();
+				const lines = [];
+				let buffer = document.createDocumentFragment();
+
+				contents.childNodes.forEach(node => {
+					if (node.nodeType === Node.ELEMENT_NODE && isBlock(node)) {
+						lines.push(node);
+					} else {
+						buffer.appendChild(node);
+					}
+				});
+				if (buffer.childNodes.length) {
+					const p = document.createElement("p");
+					while (buffer.firstChild) p.appendChild(buffer.firstChild);
+					lines.push(p);
+				}
+
+				const list = document.createElement(listTag);
+				lines.forEach(line => {
+					const li = document.createElement("li");
+
+					while (line.firstChild) li.appendChild(line.firstChild);
+					list.appendChild(li);
+				});
+
+				range.insertNode(list);
+
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				const r = document.createRange();
+				r.selectNodeContents(list);
+				r.collapse(false);
+				sel.addRange(r);
+			}
+
+			function setAlign(dir) {
+				applyToCellsOrDefault(
+					td => td.style.textAlign = dir,
+					() => setBlockAlignment(dir)
+				);
+			}
+
+			function openFile(event) {
+				const input = event.target;
+				const file = input.files && input.files[0];
+				if (!file) return;
+
+				const reader = new FileReader();
+				reader.onload = () => {
+					const dataUrl = reader.result;
+					const width = document.getElementById("imgWidth").value.trim();
+					const height = document.getElementById("imgHeight").value.trim();
+					const align = document.getElementById("imgAlign").value;
+					const caption = document.getElementById("imgCaption").value.trim();
+
+					let style = "max-height: 100px;";
+					if (width) style += "width: " + width + ";";
+					if (height) style += "height: " + height + ";";
+					if (align === "left") style += "margin: 6px;";
+					else if (align === "right") style += "margin: 6px;";
+
+					let html = "<figure style='text-align: " + align + ";'><img src='" + dataUrl + "' style='" + style + "'>";
+					if (caption) html += "<figcaption>" + caption + "</figcaption>";
+					html += "</figure>";
+
+					document.getElementById("imgPreview").innerHTML = html;
+
+					document.getElementById("imgUrl").value = dataUrl;
+				};
+				reader.readAsDataURL(file);
+			}
+
+			function startCellSelection(cell) {
+				selecting = true;
+				startCell = cell;
+				clearSelection();
+				cell.classList.add("selected");
+			}
+
+			function updateCellSelection(cell) {
+				if (selecting && cell) {
+					clearSelection();
+					highlightRect(startCell, cell);
+				}
+			}
+
+			function endCellSelection() {
+				selecting = false;
+				startCell = null;
+			}
+
+			let mouseTimer = null;
+			let mouseMoved = false;
+
+			editor.addEventListener("mousedown", e => {
+				const td = e.target.closest("td");
+				if (!td) return;
+
+				mouseMoved = false;
+				mouseTimer = setTimeout(() => {
+						selecting = true;
+						startCell = td;
+						clearSelection();
+						td.classList.add("selected");
+					}, 250); // 250ms után számít "long press"-nek
+			});
+
+			editor.addEventListener("mousemove", e => {
+				if (mouseTimer) {
+					mouseMoved = true;
+				}
+				if (selecting && e.target.tagName === "TD") {
+					clearSelection();
+					highlightRect(startCell, e.target);
+				}
+			});
+
+			editor.addEventListener("mouseup", e => {
+				if (mouseTimer) {
+					clearTimeout(mouseTimer);
+					mouseTimer = null;
+					if (!mouseMoved && !selecting) {
+						const td = e.target.closest("td");
+						if (td && td.innerText.trim() === "") {
+							placeCaretInCell(td);
+						}
+					}
+				}
+				selecting = false;
+				startCell = null;
+			});
+
+			let touchTimer = null;
+			let touchMoved = false;
+
+			editor.addEventListener("touchstart", e => {
+				const td = e.target.closest("td");
+				if (!td) return;
+
+				touchMoved = false;
+				touchTimer = setTimeout(() => {
+					selecting = true;
+					startCell = td;
+					clearSelection();
+					td.classList.add("selected");
+				}, 300); // 300ms után számít "long press"-nek
+			}, {passive:false});
+
+			editor.addEventListener("touchmove", e => {
+				if (touchTimer) {
+					clearTimeout(touchTimer);
+					touchTimer = null;
+				}
+				touchMoved = true;
+				if (selecting) {
+					const touch = e.touches[0];
+					const el = document.elementFromPoint(touch.clientX, touch.clientY);
+					const td = el?.closest("td");
+					if (td) {
+						clearSelection();
+						highlightRect(startCell, td);
+					}
+				}
+			}, {passive:false});
+
+			editor.addEventListener("touchend", e => {
+				if (touchTimer) {
+					clearTimeout(touchTimer);
+					touchTimer = null;
+					if (!touchMoved) {
+						const td = e.target.closest("td");
+						if (td && td.innerText.trim() === "") {
+							placeCaretInCell(td);
+						}
+					}
+				}
+				selecting = false;
+				startCell = null;
+			});
+
+			function placeCaretInCell(td) {
+				const range = document.createRange();
+				range.selectNodeContents(td);
+				range.collapse(false); // a cella VÉGÉRE teszi
+				const sel = window.getSelection();
+				sel.removeAllRanges();
+				sel.addRange(range);
+			}
+
+			document.addEventListener("selectionchange", () => {
+				if (updateToolbarState._raf) return;
+				updateToolbarState._raf = requestAnimationFrame(() => {
+					updateToolbarState._raf = null;
+					updateToolbarState();
+				});
+			});
+
+			function updateToolbarState() {
+				const sel = window.getSelection();
+				if (!sel.rangeCount) return;
+
+				let node = sel.focusNode;
+				if (!node) return;
+				const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+				if (!el) return;
+
+				const computed = window.getComputedStyle(el);
+				const block = getNearestBlockAncestor(sel.getRangeAt(0));
+
+				setActiveButton('[data-cmd="bold"]', isBold(el, computed));
+				setActiveButton('[data-cmd="italic"]', isItalic(el, computed));
+				setActiveButton('[data-cmd="underline"]', isUnderlined(el, computed));
+
+				const align = (block?.style?.textAlign || window.getComputedStyle(block || el).textAlign || 'left');
+				['left','center','right','justify'].forEach(a => {
+					setActiveButton(`[data-align="${a}"]`, align === a || (a === 'left' && !align));
+				});
+
+				const fontSize = toPx(computed.fontSize);
+				setSelectValue('fontSizeSelect', fontSize);
+
+				const fontFamily = normalizeFontFamily(computed.fontFamily);
+				setSelectValue('fontFamilySelect', findMatchingFontOption('fontFamilySelect', fontFamily));
+
+				const lineHeight = computed.lineHeight; // lehet szám vagy px; preferált: szám (unitless)
+				setSelectValue('lineHeightSelect', toUnitlessLineHeight(lineHeight, fontSize));
+
+				const tag = block?.tagName?.toLowerCase();
+				setSelectValue('headerSelect', ['h1','h2','h3','h4','h5','h6'].includes(tag) ? tag : '');
+
+				setColorInput('colorInput', rgbToHex(computed.color));
+				setColorInput('bgColorInput', rgbToHex(computed.backgroundColor));
+			}
+
+			function setActiveButton(selector, active) {
+				const btn = document.querySelector(selector);
+				if (!btn) return;
+				btn.classList.toggle('active', !!active);
+			}
+
+			function setSelectValue(id, value) {
+				const select = document.getElementById(id);
+				if (!select) return;
+				let matched = false;
+				[...select.options].forEach(opt => {
+					const ok = opt.value && value && opt.value.toLowerCase() === String(value).toLowerCase();
+					opt.selected = ok;
+					matched = matched || ok;
+				});
+			}
+
+			function setColorInput(id, hex) {
+				const input = document.getElementById(id);
+				if (!input || !hex) return;
+				if (/^#[0-9a-f]{6}$/i.test(hex)) input.value = hex;
+			}
+
+			function isBold(el, computed) {
+				const weight = computed.fontWeight;
+				const byWeight = Number(weight) >= 600 || weight === 'bold';
+				return byWeight || hasAncestorTags(el, ['B','STRONG']);
+			}
+
+			function isItalic(el, computed) {
+				const byStyle = computed.fontStyle === 'italic' || computed.fontStyle === 'oblique';
+				return byStyle || hasAncestorTags(el, ['I','EM']);
+			}
+
+			function isUnderlined(el, computed) {
+				const deco = computed.textDecorationLine || computed.textDecoration;
+				const byDeco = deco && String(deco).includes('underline');
+				return byDeco || hasAncestorTags(el, ['U']);
+			}
+
+			function hasAncestorTags(el, tags) {
+				let n = el;
+				while (n) {
+					if (n.tagName && tags.includes(n.tagName)) return true;
+					n = n.parentElement;
+				}
+				return false;
+			}
+
+			function toPx(size) {
+				return size.endsWith('px') ? size : size;
+			}
+
+			function normalizeFontFamily(ff) {
+				const first = (ff || '').split(',')[0].trim().replace(/^['"]|['"]$/g,'');
+				return first;
+			}
+
+			function findMatchingFontOption(selectId, family) {
+				const select = document.getElementById(selectId);
+				if (!select) return '';
+
+				let best = '';
+				[...select.options].some(opt => {
+					const val = opt.value.toLowerCase();
+					if (val.includes(family.toLowerCase())) {
+						best = opt.value;
+						return true;
+					}
+					return false;
+				});
+				return best;
+			}
+
+			function toUnitlessLineHeight(lh, fontSizePx) {
+				if (!lh) return '';
+				if (lh.endsWith && lh.endsWith('px')) {
+					const px = parseFloat(lh);
+					const fs = parseFloat(fontSizePx);
+					if (fs > 0) return String((px / fs).toFixed(2)).replace(/\.00$/,'');
+					return '';
+				}
+				if (lh === 'normal') return '';
+				return lh;
+			}
+
+			function rgbToHex(rgb) {
+				if (!rgb) return '';
+				if (rgb.startsWith('rgba')) {
+					const m = rgb.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([.\d]+)\)/i);
+					if (!m) return '';
+					const a = parseFloat(m[4]);
+					if (a === 0) return ''; // teljesen átlátszó
+					const [r,g,b] = m.slice(1,4).map(Number);
+					return toHex(r,g,b);
+				}
+				const m = rgb.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/i);
+				if (!m) return '';
+				const [r,g,b] = m.slice(1,4).map(Number);
+				return toHex(r,g,b);
+			}
+
+			function toHex(r,g,b) {
+				const h = x => x.toString(16).padStart(2,'0');
+				return `#${h(r)}${h(g)}${h(b)}`;
+			}
+		</script>
+	</div>
+</body>
+</html>
